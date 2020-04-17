@@ -9,11 +9,13 @@ public class GamePacket {
     private Lobby lobby;
     private String message;
     private UUID uuid;
+    private String name;
 
-    public GamePacket(Lobby lobby, String message, UUID uuid) {
+    public GamePacket(Lobby lobby, String message, UUID uuid, String name) {
         this.lobby = lobby;
         this.message = message;
         this.uuid = uuid;
+        this.name = name;
     }
 
     public Lobby getLobby() {
@@ -26,5 +28,9 @@ public class GamePacket {
 
     public UUID getUuid() {
         return uuid;
+    }
+
+    public String getName() {
+        return name;
     }
 }

@@ -18,9 +18,13 @@ public class LobbyManager {
     private static final List<Lobby> lobbies = new ArrayList<>();
 
     static void addPlayerToLobby(Player player, Lobby lobby) {
-        playersIn.remove(player.getUuid());
+        unloadPlayer(player.getUuid());
         players.put(player.getUuid(), player);
         playersIn.put(player.getUuid(), lobby);
+    }
+
+    public static void unloadPlayer(UUID uuid) {
+        playersIn.remove(uuid);
     }
 
     public static Lobby getLobby(String alias) {

@@ -9,7 +9,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.Scanner;
 
-import nl.guuslieben.cn2tcp.CN2;
+import nl.guuslieben.cn2tcp.CN2_Server;
 import nl.guuslieben.cn2tcp.core.util.net.NetworkUtil;
 
 public class GameClient {
@@ -32,13 +32,14 @@ public class GameClient {
         var running = true;
         while (running) {
             try {
-                logger.info(">> Waiting for user\r");
+                logger.debug(">> Waiting for user\r");
                 var move = scanner.nextLine();
                 var response = sendEcho(move);
                 logger.info(response);
                 if (move.equals("!forcequit")) {
                     running = false;
                     close();
+                    break;
                 }
 
             } catch (IOException | IllegalArgumentException | NullPointerException e) {
@@ -49,7 +50,7 @@ public class GameClient {
 
     public String sendEcho(String msg) throws IOException {
         var buf = msg.getBytes();
-        var packet = new DatagramPacket(buf, buf.length, address, CN2.SERVER_PORT);
+        var packet = new DatagramPacket(buf, buf.length, address, CN2_Server.SERVER_PORT);
         socket.send(packet);
 
         var receiveBuf = new byte[4096];

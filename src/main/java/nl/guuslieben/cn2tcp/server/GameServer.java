@@ -10,7 +10,7 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.util.UUID;
 
-import nl.guuslieben.cn2tcp.CN2;
+import nl.guuslieben.cn2tcp.CN2_Server;
 import nl.guuslieben.cn2tcp.core.enums.GameState;
 import nl.guuslieben.cn2tcp.core.enums.Move;
 import nl.guuslieben.cn2tcp.core.enums.Result;
@@ -27,7 +27,7 @@ public class GameServer extends Thread {
     private final Logger logger;
 
     public GameServer() throws SocketException {
-        socket = new DatagramSocket(CN2.SERVER_PORT);
+        socket = new DatagramSocket(CN2_Server.SERVER_PORT);
         logger = LoggerFactory.getLogger("Server");
         running = true;
     }
@@ -56,6 +56,9 @@ public class GameServer extends Thread {
                 UUID uuid = gamePacket.getUuid();
                 var playerCandidate = LobbyManager.getPlayer(uuid);
                 var player = playerCandidate.orElseGet(() -> new Player(uuid, LobbyManager.totalPlayerCount() + 1));
+                if (gamePacket.getName() != null) player.setName(gamePacket.getName());
+
+                logger.debug(String.format("Received request from %s:%d (%s)", address.getHostAddress(), port, uuid.toString()));
 
                 // Make sure the player is registered to their active lobby according to both the client and server
                 var lobby = gamePacket.getLobby();
@@ -92,25 +95,27 @@ public class GameServer extends Thread {
     private void handleMove(String received, Player player, InetAddress address, int port, Lobby lobby) {
         try {
             // Can throw an exception, either null or illegal argument. If thrown will return unknown command status
-            var move = Enum.valueOf(Move.class, received.toUpperCase());
-            Result result = lobby.move(player, move);
-            String response;
-            switch (result) {
-                case WINNER:
-                    response = String.format("Received move '%s'. We have a winner! %s", move, lobby.getWinners()[0]);
-                    break;
-                case WAITING:
-                    response = String.format("Received move '%s'. Waiting for %d players to play.", move, (lobby.getPlayers().size() - lobby.getMoves()));
-                    break;
-                case TIE:
-                    response = String.format("Received move '%s'. Tied! %s", move, String.join(", ", lobby.getWinners()));
-                    break;
-                default:
-                    response = "Failed to get a response";
-                    break;
+            if (lobby.getGameState() == GameState.ENDED) send("This lobby is no longer accepting moves", address, port);
+            else {
+                var move = Enum.valueOf(Move.class, received.toUpperCase());
+                Result result = lobby.move(player, move);
+                String response;
+                switch (result) {
+                    case WINNER:
+                        response = String.format("Confirmed move '%s'. We have a winner! %s", move, lobby.getWinners()[0]);
+                        break;
+                    case WAITING:
+                        response = String.format("Confirmed move '%s'. Waiting for %d players to play.", move, (lobby.getPlayers().size() - lobby.getMoves()));
+                        break;
+                    case TIE:
+                        response = String.format("Confirmed move '%s'. Tied! %s", move, String.join(", ", lobby.getWinners()));
+                        break;
+                    default:
+                        response = "Failed to get a response";
+                        break;
+                }
+                send(response, address, port);
             }
-            ;
-            send(response, address, port);
         } catch (Exception e) {
             send(String.format("Unknown command '%s'", received), address, port);
         }
@@ -142,6 +147,7 @@ public class GameServer extends Thread {
     }
 
     private void send(String msg, InetAddress address, int port) {
+        logger.debug(String.format("Sending response '%s' to %s:%d", msg, address.getHostAddress(), port));
         send(new DatagramPacket(msg.getBytes(), msg.getBytes().length, address, port));
     }
 
@@ -160,10 +166,11 @@ public class GameServer extends Thread {
         if (dataParts.length > 1) {
             var lobby = LobbyManager.getLobby(dataParts[0]);
             var message = dataParts[1];
-            if (dataParts.length > 2) uuid = UUID.nameUUIDFromBytes(dataParts[2].getBytes());
-            return new GamePacket(lobby, message, uuid);
+            String name = null;
+            if (dataParts.length > 2) name = dataParts[2];
+            return new GamePacket(lobby, message, uuid, name);
         } else {
-            return new GamePacket(null, dataString, uuid);
+            return new GamePacket(null, dataString, uuid, null);
         }
     }
 }

@@ -16,7 +16,7 @@ public class Player {
     public Player(UUID uuid, int number) {
         this.uuid = uuid;
         this.name = NetworkUtil.getRandomName(number);
-        logger.warn("New player created with name " + name + " and uuid " + uuid.toString());
+        logger.info("New player created with name " + name + " and uuid " + uuid.toString());
     }
 
     public UUID getUuid() {
