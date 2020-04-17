@@ -1,0 +1,22 @@
+plugins {
+    id 'java'
+}
+
+group 'nl.guuslieben'
+version '1.0-SNAPSHOT'
+
+compileJava   {
+    sourceCompatibility = '11'
+    targetCompatibility = '11'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+    compile group: 'org.slf4j', name: 'slf4j-simple', version: '1.6.1'
+    compile group: 'org.json', name: 'json', version: '20090211'
+
+}
