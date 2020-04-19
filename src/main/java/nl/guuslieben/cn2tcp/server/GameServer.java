@@ -55,7 +55,7 @@ public class GameServer extends Thread {
                 // Construct a player from the return address
                 UUID uuid = gamePacket.getUuid();
                 var playerCandidate = LobbyManager.getPlayer(uuid);
-                var player = playerCandidate.orElseGet(() -> new Player(uuid, LobbyManager.totalPlayerCount() + 1));
+                var player = playerCandidate.orElseGet(() -> new Player(uuid, LobbyManager.totalPlayerCount() + 1, address));
                 if (gamePacket.getName() != null) player.setName(gamePacket.getName());
 
                 logger.debug(String.format("Received request from %s:%d (%s)", address.getHostAddress(), port, uuid.toString()));
@@ -101,18 +101,16 @@ public class GameServer extends Thread {
                 Result result = lobby.move(player, move);
                 String response;
                 switch (result) {
-                    case WINNER:
-                        response = String.format("Confirmed move '%s'. We have a winner! %s", move, lobby.getWinners()[0]);
-                        break;
-                    case WAITING:
-                        response = String.format("Confirmed move '%s'. Waiting for %d players to play.", move, (lobby.getPlayers().size() - lobby.getMoves()));
-                        break;
-                    case TIE:
-                        response = String.format("Confirmed move '%s'. Tied! %s", move, String.join(", ", lobby.getWinners()));
-                        break;
-                    default:
-                        response = "Failed to get a response";
-                        break;
+                    case WINNER -> {
+                        response = String.format("Confirmed move '%s'", move);
+                        lobby.broadcast(String.format("We have a winner in lobby '%s', %s", lobby.getAlias(), lobby.getWinners()[0]));
+                    }
+                    case WAITING -> response = String.format("Confirmed move '%s'. Waiting for %d players to play.", move, (lobby.getPlayers().size() - lobby.getMoves()));
+                    case TIE -> {
+                        response = String.format("Confirmed move '%s'", move);
+                        lobby.broadcast(String.format("We are tied in lobby '%s', %s are tied", lobby.getAlias(), String.join(", ", lobby.getWinners())));
+                    }
+                    default -> response = "Failed to get a response";
                 }
                 send(response, address, port);
             }
@@ -141,7 +139,7 @@ public class GameServer extends Thread {
     private void handleRegistration(String received, Player player, InetAddress address, int port, Lobby lobby) {
         var parts = received.split(" ");
         if (parts.length > 1)
-            player = new Player(UUID.nameUUIDFromBytes(parts[1].getBytes()), lobby.getPlayers().size() + 1);
+            player = new Player(UUID.nameUUIDFromBytes(parts[1].getBytes()), lobby.getPlayers().size() + 1, address);
         lobby.joinPlayer(player);
         send(String.format("You are now playing as %s in lobby %s", player.getName(), lobby.getAlias()), address, port);
     }

@@ -7,23 +7,26 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.util.Scanner;
 
+import nl.guuslieben.cn2tcp.CN2_Client;
 import nl.guuslieben.cn2tcp.CN2_Server;
 import nl.guuslieben.cn2tcp.core.util.net.NetworkUtil;
 
 public class GameClient {
 
-    private DatagramSocket socket;
+    private final DatagramSocket socket;
     private final InetAddress address;
     private final Logger logger;
+    private static boolean isActive = true;
 
     public GameClient() throws IOException {
         socket = new DatagramSocket();
         address = InetAddress.getByName("localhost");
         logger = LoggerFactory.getLogger("Client");
         logger.info("Registering to server\n:: -> " + sendEcho("default|!reg"));
-
+        new GameClientBroadcastListener(logger).start();
         this.play();
     }
 
@@ -60,19 +63,44 @@ public class GameClient {
         return NetworkUtil.convertBytes(packet.getData());
     }
 
-    public String receive() throws IOException {
-        String result;
-        do {
-            result = sendEcho("!tick");
-        } while (result == null || result.equals(""));
-
-        logger.info("Got result : " + result);
-        return result;
-    }
-
     public void close() throws IOException {
         sendEcho("!forcequit");
         socket.close();
+        isActive = false;
+    }
+
+    private static class GameClientBroadcastListener extends Thread {
+
+        private final DatagramSocket socket;
+        private final Logger logger;
+
+        public GameClientBroadcastListener(Logger logger) throws SocketException {
+            this.socket = new DatagramSocket(CN2_Client.CLIENT_PORT);
+            this.logger = logger;
+        }
+
+        @Override
+        public void run() {
+            while (GameClient.isActive) {
+                try {
+                    var buf = new byte[4096];
+                    var packet = new DatagramPacket(buf, buf.length);
+                    socket.receive(packet);
+
+                    var address = packet.getAddress();
+                    int port = packet.getPort();
+
+                    // Fill packet with newly received buffer and convert to String
+                    packet = new DatagramPacket(buf, buf.length, address, port);
+                    String message = NetworkUtil.convertBytes(packet.getData());
+
+                    logger.info(String.format("Received broadcast : %s", message));
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
 }
